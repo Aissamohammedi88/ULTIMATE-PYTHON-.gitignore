@@ -1,0 +1,1354 @@
+#!/usr/bin/env python3# -*- coding: utf-8 -*-
+"""
+═══════════════════════════════════════════════════════════════════════════
+NEXUS .GITIGNORE GENERATOR — LOCAL SERVER
+═══════════════════════════════════════════════════════════════════════════
+Génère un .gitignore ULTIME adapté à un projet Python + NEXUS.
+Interface web locale sur http://localhost:8721/
+
+Fonctionnalités :
+- 18 sections couvrant Python, tests, IDE, OS, cloud, secrets
+- Détection automatique du type de projet (scan du dossier)
+- Génération .gitignore en un clic
+- Téléchargement direct du fichier
+- Édition live avec prévisualisation
+- Presets : python / data-science / django / flask / fastapi /
+node / rust / go / docker / cobol / nexus / full
+
+Auteur : Aissa Mohammedi (DGK)
+Licence : NEXUS-OPEN-2.0
+═══════════════════════════════════════════════════════════════════════════
+"""
+
+import os
+import sys
+import json
+import socket
+import argparse
+import threading
+import urllib.parse
+from pathlib import Path
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+VERSION = "1.0.0"
+AUTEUR = "Aissa Mohammedi (DGK)"
+LICENCE = "NEXUS-OPEN-2.0"
+CODENAME = "Gitignore Forge"
+
+HOME = Path.home()
+BASE = HOME / "Documents" / "nexus_gitignore"
+BASE.mkdir(parents=True, exist_ok=True)
+
+HOST = "127.0.0.1"
+PORT = 8721
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTIONS DE .GITIGNORE
+# ═══════════════════════════════════════════════════════════════════════════
+
+SECTIONS = {
+"nexus": {
+"name": "NEXUS Spécifique",
+"icon": "🧬",
+"lines": [
+"# Base NEXUS",
+"/etc/nexus/",
+"nexus_data/",
+"nexus_state/",
+"nexus_logs/",
+"nexus_cache/",
+"nexus_sessions/",
+"nexus_backup/",
+"nexus_export/",
+"nexus_results/",
+"cerveau_data/",
+"slidedeck/output/",
+"",
+"# Fichiers d'état NEXUS",
+"state.json",
+"state.txt",
+"*.state",
+"latency_report_*.txt",
+"network_report_*.txt",
+"rapport_*.json",
+"rapport_*.md",
+"rapport_*.txt",
+"vrp_report_*.json",
+"vrp_report_*.md",
+"tenders_*.json",
+"tenders_*.md",
+"scan_*.json",
+"static_hunt_*.json",
+"bench_*.json",
+"benchmark_*.json",
+"probe_*.json",
+"cobol_run_*.json",
+"cobol_run_*.md",
+"devis_*.pdf",
+"facture_*.pdf",
+"",
+"# Services systemd NEXUS",
+"nexus-*.service",
+"",
+"# Config NEXUS",
+"nexus.conf",
+"nexus.cfg",
+"cake.conf",
+"torrc",
+"sessions.db",
+"sessions.db-journal",
+"sessions.db-wal",
+"sessions.db-shm",
+],
+},
+"python": {
+"name": "Python Fondamental",
+"icon": "🐍",
+"lines": [
+"# Bytecode",
+"__pycache__/",
+"*.py[cod]",
+"*$py.class",
+"*.pyc",
+"*.pyo",
+"*.pyd",
+"",
+"# Extensions C",
+"*.so",
+"*.o",
+"*.a",
+"*.dylib",
+"*.dll",
+"*.lib",
+"*.exp",
+"",
+"# Build / Distribution",
+"build/",
+"develop-eggs/",
+"dist/",
+"downloads/",
+"eggs/",
+".eggs/",
+"lib/",
+"lib64/",
+"parts/",
+"sdist/",
+"var/",
+"wheels/",
+"share/python-wheels/",
+"*.egg-info/",
+".installed.cfg",
+"*.egg",
+"MANIFEST",
+"pip-log.txt",
+"pip-delete-this-directory.txt",
+"pip-wheel-metadata/",
+"",
+"# Installeurs",
+"*.manifest",
+"*.spec",
+],
+},
+"venv": {
+"name": "Environnements Virtuels",
+"icon": "📦",
+"lines": [
+"# Virtualenv",
+".env",
+".venv",
+"env/",
+"venv/",
+"ENV/",
+"env.bak/",
+"venv.bak/",
+"",
+"# Pipenv",
+"# Pipfile.lock",
+"",
+"# Poetry",
+"# poetry.lock",
+"",
+"# PDM",
+".pdm.toml",
+"# pdm.lock",
+"",
+"# Pyenv",
+".python-version",
+"",
+"# PEP 582",
+"__pypackages__/",
+],
+},
+"tests": {
+"name": "Tests & Couverture",
+"icon": "🧪",
+"lines": [
+"# pytest",
+".pytest_cache/",
+".cache",
+"nosetests.xml",
+"",
+"# Coverage",
+".coverage",
+".coverage.*",
+"coverage.xml",
+"*.cover",
+"htmlcov/",
+"coverage/",
+"",
+"# tox",
+".tox/",
+".nox/",
+"",
+"# Hypothesis",
+".hypothesis/",
+"",
+"# Unit test / coverage reports",
+"*.coveragerc",
+".coverage.*",
+],
+},
+"typing": {
+"name": "Type Checkers",
+"icon": "🔍",
+"lines": [
+"# mypy",
+".mypy_cache/",
+".dmypy.json",
+"dmypy.json",
+"",
+"# pyre",
+".pyre/",
+"",
+"# pytype",
+".pytype/",
+"",
+"# pyright",
+"pyrightconfig.json",
+"",
+"# ruff",
+".ruff_cache/",
+],
+},
+"docs": {
+"name": "Documentation",
+"icon": "📚",
+"lines": [
+"# Sphinx",
+"docs/_build/",
+"docs/build/",
+"",
+"# MkDocs",
+"/site/",
+"",
+"# pdoc",
+"pdoc/",
+],
+},
+"notebooks": {
+"name": "Notebooks",
+"icon": "📓",
+"lines": [
+"# Jupyter",
+".ipynb_checkpoints/",
+"*.ipynb_checkpoints/",
+"",
+"# IPython",
+"profile_default/",
+"ipython_config.py",
+"",
+"# JupyterLab",
+".jupyter/",
+"jupyterlab_config.json",
+],
+},
+"django": {
+"name": "Django",
+"icon": "🎯",
+"lines": [
+"# Django",
+"*.log",
+"local_settings.py",
+"db.sqlite3",
+"db.sqlite3-journal",
+"media/",
+"staticfiles/",
+"static_root/",
+"*.pot",
+"*.mo",
+],
+},
+"flask": {
+"name": "Flask",
+"icon": "🌶️",
+"lines": [
+"# Flask",
+"instance/",
+".webassets-cache",
+"flask_session/",
+".flaskenv",
+],
+},
+"fastapi": {
+"name": "FastAPI",
+"icon": "⚡",
+"lines": [
+"# FastAPI",
+"*.sqlite",
+"*.sqlite3",
+".fastapi_cache/",
+],
+},
+"scrapy": {
+"name": "Scrapy",
+"icon": "🕷️",
+"lines": [
+"# Scrapy",
+".scrapy/",
+"scrapy.cfg",
+"*.jl",
+],
+},
+"celery": {
+"name": "Celery",
+"icon": "🌿",
+"lines": [
+"# Celery",
+"celerybeat-schedule",
+"celerybeat.pid",
+"celerybeat-schedule.*",
+],
+},
+"cython": {
+"name": "Cython",
+"icon": "⚙️",
+"lines": [
+"# Cython",
+"cython_debug/",
+"*.c",
+"*.cpp",
+"!*.c.in",
+],
+},
+"sagemath": {
+"name": "SageMath",
+"icon": "🔢",
+"lines": [
+"# SageMath",
+"*.sage.py",
+],
+},
+"node": {
+"name": "Node.js (nested)",
+"icon": "🟩",
+"lines": [
+"# Node.js",
+"node_modules/",
+"npm-debug.log*",
+"yarn-debug.log*",
+"yarn-error.log*",
+"pnpm-debug.log*",
+".pnpm-store/",
+".pnp.*",
+".yarn/",
+"dist/",
+".next/",
+".nuxt/",
+".cache/",
+".parcel-cache/",
+],
+},
+"rust": {
+"name": "Rust (nested)",
+"icon": "🦀",
+"lines": [
+"# Rust",
+"target/",
+"Cargo.lock",
+"**/*.rs.bk",
+],
+},
+"go": {
+"name": "Go (nested)",
+"icon": "🔷",
+"lines": [
+"# Go",
+"*.exe",
+"*.exe~",
+"*.test",
+"*.out",
+"go.work",
+],
+},
+"docker": {
+"name": "Docker",
+"icon": "🐳",
+"lines": [
+"# Docker",
+".dockerignore",
+"docker-compose.override.yml",
+"docker-compose.override.yaml",
+],
+},
+"secrets": {
+"name": "Secrets & Credentials",
+"icon": "🔐",
+"lines": [
+"# Secrets",
+"*.key",
+"*.pem",
+"*.crt",
+"*.cer",
+"*.der",
+"*.p12",
+"*.pfx",
+"*.csr",
+"id_rsa",
+"id_rsa.pub",
+"id_ed25519",
+"id_ed25519.pub",
+"secrets/",
+"credentials/",
+"keys/",
+"tokens/",
+".env",
+".env.*",
+"!.env.example",
+"!.env.template",
+"config.local.json",
+"config.secret.json",
+],
+},
+"os": {
+"name": "OS (Linux/macOS/Windows/iOS)",
+"icon": "💻",
+"lines": [
+"# macOS",
+".DS_Store",
+".DS_Store?",
+"._*",
+".Spotlight-V100",
+".Trashes",
+".AppleDouble",
+".LSOverride",
+"Icon",
+".fseventsd",
+"",
+"# Windows",
+"Thumbs.db",
+"Thumbs.db:encryptable",
+"ehthumbs.db",
+"ehthumbs_vista.db",
+"Desktop.ini",
+"$RECYCLE.BIN/",
+"*.lnk",
+"",
+"# Linux",
+".directory",
+".Trash-*",
+".nfs*",
+".fuse_hidden*",
+"",
+"# iOS a-Shell",
+".a-shell/",
+"*.a-shell-cache",
+],
+},
+"ide": {
+"name": "IDEs & Editors",
+"icon": "🛠️",
+"lines": [
+"# VS Code",
+".vscode/",
+"!.vscode/settings.json.example",
+"!.vscode/extensions.json.example",
+"",
+"# PyCharm / JetBrains",
+".idea/",
+"*.iml",
+"*.ipr",
+"*.iws",
+"out/",
+"",
+"# Vim",
+"*.swp",
+"*.swo",
+".*.sw?",
+".netrwhist",
+"",
+"# Emacs",
+"*~",
+"\\#*\\#",
+".\\#*",
+"",
+"# Sublime Text",
+"*.sublime-workspace",
+"*.sublime-project",
+"",
+"# Atom",
+".atom/",
+".npm/",
+"",
+"# Spyder",
+".spyderproject",
+".spyproject",
+"",
+"# Rope",
+".ropeproject",
+"",
+"# Nano",
+"*.save",
+],
+},
+"backups": {
+"name": "Backups & Archives",
+"icon": "💾",
+"lines": [
+"# Backups",
+"*.bak",
+"*.backup",
+"*.orig",
+"*.rej",
+"*.save",
+"*.tmp",
+"*~",
+"",
+"# Archives",
+"*.7z",
+"*.dmg",
+"*.gz",
+"*.iso",
+"*.rar",
+"*.tar",
+"*.tar.gz",
+"*.tgz",
+"*.zip",
+"*.bz2",
+"*.xz",
+"*.zst",
+],
+},
+"logs": {
+"name": "Logs & PID",
+"icon": "📝",
+"lines": [
+"# Logs",
+"*.log",
+"logs/",
+"log/",
+"",
+"# PID",
+"*.pid",
+"*.pid.lock",
+"",
+"# Runtime",
+"*.runtime",
+"runtime/",
+],
+},
+"misc": {
+"name": "Divers",
+"icon": "📦",
+"lines": [
+"# Système",
+".local/",
+".cache/",
+".temp/",
+".tmp/",
+"tmp/",
+"temp/",
+"",
+"# Spécifique",
+"*.sage.py",
+"*.mo",
+"*.pot",
+"*.csr",
+".keep",
+],
+},
+"license": {
+"name": "Licence & Meta (exceptions)",
+"icon": "⚖️",
+"lines": [
+"# ═══════════════════════════════════════════════════════════",
+"# EXCEPTIONS — FICHIERS À GARDER",
+"# ═══════════════════════════════════════════════════════════",
+"!README.md",
+"!LICENSE",
+"!CHANGELOG.md",
+"!CONTRIBUTING.md",
+"!SECURITY.md",
+"!CODE_OF_CONDUCT.md",
+"!.gitignore",
+"!.gitattributes",
+"!.editorconfig",
+"!assets/",
+"!assets/**",
+"!docs/",
+"!docs/**",
+"!examples/",
+"!examples/**",
+"!tests/",
+"!tests/**",
+"!scripts/",
+"!scripts/**",
+"!src/",
+"!src/**",
+"!nexus_*.py",
+"!main.py",
+"!*.cob",
+"!.github/",
+"!.github/**",
+"!.github/workflows/*.yml",
+"!.github/workflows/*.yaml",
+"!.github/ISSUE_TEMPLATE/",
+"!.github/ISSUE_TEMPLATE/**",
+"!.github/PULL_REQUEST_TEMPLATE.md",
+"!config.example.json",
+"!.env.example",
+],
+},
+}
+
+
+PRESETS = {
+"python": ["nexus", "python", "venv", "tests", "typing", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"data-science": ["nexus", "python", "venv", "tests", "typing", "notebooks", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"django": ["nexus", "python", "venv", "tests", "typing", "django", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"flask": ["nexus", "python", "venv", "tests", "typing", "flask", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"fastapi": ["nexus", "python", "venv", "tests", "typing", "fastapi", "docker", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"scrapy": ["nexus", "python", "venv", "tests", "scrapy", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"celery": ["nexus", "python", "venv", "tests", "celery", "docker", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"cython": ["nexus", "python", "venv", "tests", "cython", "docs", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"node": ["nexus", "node", "docker", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"rust": ["nexus", "rust", "docker", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"go": ["nexus", "go", "docker", "ide", "os", "backups", "logs", "secrets", "misc", "license"],
+"docker": ["nexus", "docker", "secrets", "logs", "misc", "license"],
+"cobol": ["nexus", "secrets", "logs", "backups", "ide", "os", "misc", "license"],
+"nexus": list(SECTIONS.keys()),
+"minimal": ["python", "venv", "os", "ide", "license"],
+"full": list(SECTIONS.keys()),
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# GÉNÉRATEUR
+# ═══════════════════════════════════════════════════════════════════════════
+
+def generate_gitignore(selected_sections, header=True, comments=True):
+"""Génère le contenu du .gitignore."""
+lines = []
+
+if header:
+lines.extend([
+"# ═══════════════════════════════════════════════════════════════════════════",
+"# NEXUS ULTIMATE .gitignore",
+"# Généré par NEXUS Gitignore Forge v" + VERSION,
+"# Auteur : " + AUTEUR,
+"# Licence : " + LICENCE,
+"# Date : " + datetime.now().isoformat(),
+"# ═══════════════════════════════════════════════════════════════════════════",
+"",
+])
+
+for key in selected_sections:
+sec = SECTIONS.get(key)
+if not sec:
+continue
+
+if comments:
+lines.append("")
+lines.append("# ═══════════════════════════════════════════════════════════════════════════")
+lines.append(f"# {sec['icon']} {sec['name'].upper()}")
+lines.append("# ═══════════════════════════════════════════════════════════════════════════")
+lines.append("")
+
+lines.extend(sec["lines"])
+
+lines.append("")
+return "\n".join(lines)
+
+
+def detect_project_type(path):
+"""Détecte le type de projet dans un dossier."""
+detected = []
+p = Path(path)
+
+markers = {
+"requirements.txt": "python",
+"pyproject.toml": "python",
+"setup.py": "python",
+"Pipfile": "python",
+"Pipfile.lock": "python",
+"poetry.lock": "python",
+"pdm.lock": "python",
+".python-version": "python",
+"manage.py": "django",
+"settings.py": "django",
+"wsgi.py": "django",
+"app.py": "flask",
+"flask_config.py": "flask",
+"fastapi": "fastapi",
+"main.py": "python",
+"scrapy.cfg": "scrapy",
+"celery.py": "celery",
+"tasks.py": "celery",
+"package.json": "node",
+"node_modules": "node",
+"Cargo.toml": "rust",
+"go.mod": "go",
+"Dockerfile": "docker",
+"docker-compose.yml": "docker",
+"docker-compose.yaml": "docker",
+".ipynb": "data-science",
+"notebooks": "data-science",
+}
+
+if not p.exists() or not p.is_dir():
+return ["python"]
+
+try:
+files = set(f.name for f in p.iterdir())
+except OSError:
+return ["python"]
+
+# Extensions notables
+extensions = set()
+try:
+for f in p.iterdir():
+if f.is_file() and "." in f.name:
+extensions.add(f.suffix.lower())
+except OSError:
+pass
+
+for marker, proj_type in markers.items():
+if marker in files:
+detected.append(proj_type)
+
+if ".ipynb" in extensions:
+detected.append("data-science")
+if ".cob" in extensions or ".cbl" in extensions:
+detected.append("cobol")
+if ".rs" in extensions:
+detected.append("rust")
+if ".go" in extensions:
+detected.append("go")
+
+# Toujours Python par défaut
+if not detected:
+detected.append("python")
+
+# Dédupliquer
+return list(dict.fromkeys(detected))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HTML / CSS / JS INTERFACE
+# ═══════════════════════════════════════════════════════════════════════════
+
+HTML_PAGE = r"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXUS Gitignore Forge</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+:root{
+--bg:#02040a;
+--card:#0a1018;
+--border:#1a2540;
+--cyan:#00d4ff;
+--gold:#c8a45c;
+--rose:#ff6ec7;
+--violet:#a855f7;
+--green:#00ff88;
+--text:#e0e8f0;
+--dim:#6a7a8a;
+--mono:ui-monospace,'SF Mono',Menlo,monospace;
+--sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+body{
+font-family:var(--sans);background:var(--bg);color:var(--text);
+min-height:100vh;padding:24px 16px;
+background-image:
+radial-gradient(ellipse at 15% 0%,rgba(0,212,255,0.10),transparent 50%),
+radial-gradient(ellipse at 85% 100%,rgba(168,85,247,0.10),transparent 50%);
+}
+.wrap{max-width:1300px;margin:0 auto}
+h1{
+font-size:clamp(28px,5vw,42px);font-weight:800;letter-spacing:-2px;
+background:linear-gradient(90deg,#fff,#00d4ff,#a855f7,#ff6ec7);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+background-clip:text;margin-bottom:6px;
+}
+.sub{color:var(--dim);font-size:11px;font-family:var(--mono);
+letter-spacing:2px;text-transform:uppercase;margin-bottom:24px}
+.panel{background:rgba(10,16,24,0.72);border:1px solid var(--border);
+border-radius:14px;padding:20px;margin-bottom:16px;
+backdrop-filter:blur(12px)}
+.panel h2{color:var(--cyan);font-size:12px;letter-spacing:2px;
+text-transform:uppercase;margin-bottom:14px;
+padding-bottom:10px;border-bottom:1px solid var(--border)}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.preset{padding:8px 14px;background:rgba(0,212,255,0.05);
+border:1px solid rgba(0,212,255,0.2);color:var(--cyan);
+border-radius:8px;font-size:11px;font-family:var(--mono);
+cursor:pointer;transition:all 0.2s;text-transform:uppercase;
+letter-spacing:1px;font-weight:600}
+.preset:hover{background:rgba(0,212,255,0.15);border-color:var(--cyan)}
+.preset.active{background:var(--cyan);color:#000;border-color:var(--cyan)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+gap:10px}
+.section-card{background:rgba(0,212,255,0.02);
+border:1px solid rgba(0,212,255,0.1);
+border-radius:10px;padding:12px 14px;
+cursor:pointer;transition:all 0.2s;
+display:flex;align-items:center;gap:10px;user-select:none}
+.section-card:hover{background:rgba(0,212,255,0.06);
+border-color:rgba(0,212,255,0.3)}
+.section-card.checked{background:rgba(0,255,136,0.06);
+border-color:rgba(0,255,136,0.3)}
+.section-card input{margin:0;flex-shrink:0;cursor:pointer;
+accent-color:#00ff88;width:16px;height:16px}
+.section-card .icon{font-size:20px;flex-shrink:0}
+.section-card .name{font-size:12px;font-weight:600;color:var(--text);
+flex:1;line-height:1.3}
+.section-card .key{font-size:10px;font-family:var(--mono);
+color:var(--dim);margin-top:2px}
+textarea{
+width:100%;min-height:500px;padding:16px;
+background:#000;color:var(--green);font-family:var(--mono);
+font-size:12px;line-height:1.6;border:1px solid var(--border);
+border-radius:10px;resize:vertical;outline:none;
+border-left:3px solid var(--cyan);white-space:pre;tab-size:4}
+textarea:focus{border-color:var(--cyan)}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;
+font-family:var(--mono);font-size:11px;color:var(--dim)}
+.stat{background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);
+border-radius:8px;padding:6px 12px}
+.stat b{color:var(--cyan);font-weight:700}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+button{
+padding:11px 22px;background:linear-gradient(135deg,#00d4ff,#a855f7);
+color:#000;border:none;border-radius:10px;font-weight:700;
+font-family:var(--mono);font-size:12px;letter-spacing:1px;
+cursor:pointer;transition:all 0.2s;text-transform:uppercase;
+}
+button:hover{transform:translateY(-1px);
+box-shadow:0 8px 24px rgba(0,212,255,0.3)}
+button:active{transform:translateY(0)}
+button.secondary{background:transparent;color:var(--cyan);
+border:1px solid var(--cyan)}
+button.secondary:hover{background:rgba(0,212,255,0.15);
+box-shadow:0 8px 24px rgba(0,212,255,0.15)}
+.row{display:flex;gap:16px;align-items:center;margin-bottom:12px;
+flex-wrap:wrap}
+label.checkbox{display:flex;align-items:center;gap:8px;
+font-family:var(--mono);font-size:11px;color:var(--dim);
+cursor:pointer;user-select:none}
+label.checkbox input{accent-color:var(--cyan);cursor:pointer}
+input[type=text]{
+padding:10px 14px;background:rgba(0,0,0,0.4);
+border:1px solid var(--border);border-radius:8px;
+color:var(--text);font-family:var(--mono);font-size:12px;
+outline:none;flex:1;min-width:200px}
+input[type=text]:focus{border-color:var(--cyan)}
+.footer{text-align:center;color:var(--dim);
+font-family:var(--mono);font-size:11px;margin-top:30px;
+padding-top:20px;border-top:1px solid var(--border)}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;
+background:rgba(0,212,255,0.15);color:var(--cyan);
+font-size:10px;font-family:var(--mono);margin-left:8px}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+background:rgba(0,255,136,0.15);border:1px solid var(--green);
+color:var(--green);padding:12px 24px;border-radius:10px;
+font-family:var(--mono);font-size:12px;font-weight:700;
+opacity:0;transition:opacity 0.3s;z-index:1000;pointer-events:none}
+.toast.show{opacity:1}
+@media (max-width:900px){
+.grid{grid-template-columns:1fr 1fr}
+textarea{min-height:350px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>NEXUS Gitignore Forge</h1>
+<div class="sub">Ultimate .gitignore generator · localhost · v__V__</div>
+
+<div class="panel">
+<h2>⚡ Presets</h2>
+<div class="presets" id="presets"></div>
+</div>
+
+<div class="panel">
+<h2>📁 Détection automatique</h2>
+<div class="row">
+<input type="text" id="scan-path" placeholder="/chemin/vers/ton/projet (ex: ~/Documents/mon-projet)">
+<button class="secondary" onclick="scanProject()">🔍 Scanner</button>
+</div>
+<div id="scan-result" style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px"></div>
+</div>
+
+<div class="panel">
+<h2>📦 Sections <span class="badge" id="count-badge">0 / 0</span></h2>
+<div class="grid" id="sections-grid"></div>
+</div>
+
+<div class="panel">
+<h2>⚙️ Options</h2>
+<div class="row">
+<label class="checkbox">
+<input type="checkbox" id="opt-header" checked>
+En-tête NEXUS
+</label>
+<label class="checkbox">
+<input type="checkbox" id="opt-comments" checked>
+Commentaires de sections
+</label>
+</div>
+</div>
+
+<div class="panel">
+<h2>📄 .gitignore généré</h2>
+<div class="stats">
+<div class="stat">Lignes : <b id="stat-lines">0</b></div>
+<div class="stat">Caractères : <b id="stat-chars">0</b></div>
+<div class="stat">Taille : <b id="stat-size">0 B</b></div>
+<div class="stat">Sections : <b id="stat-sections">0</b></div>
+</div>
+<textarea id="output" spellcheck="false"></textarea>
+<div class="actions">
+<button onclick="copyOutput()">📋 Copier</button>
+<button onclick="downloadOutput()">⬇ Télécharger .gitignore</button>
+<button class="secondary" onclick="regenerate()">↻ Régénérer</button>
+<button class="secondary" onclick="selectPreset('full')">Tout sélectionner</button>
+<button class="secondary" onclick="clearAll()">Tout désélectionner</button>
+</div>
+</div>
+
+<div class="footer">
+NEXUS Gitignore Forge v__V__ · Aissa Mohammedi (DGK) · NEXUS-OPEN-2.0
+</div>
+
+</div>
+
+<div class="toast" id="toast">Copié !</div>
+
+<script>
+const SECTIONS = __SECTIONS_JSON__;
+const PRESETS = __PRESETS_JSON__;
+
+let selected = new Set();
+let currentPreset = 'python';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER PRESETS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderPresets() {
+const el = document.getElementById('presets');
+el.innerHTML = '';
+Object.keys(PRESETS).forEach(key => {
+const btn = document.createElement('button');
+btn.className = 'preset' + (key === currentPreset ? ' active' : '');
+btn.textContent = key;
+btn.onclick = () => selectPreset(key);
+el.appendChild(btn);
+});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER SECTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderSections() {
+const el = document.getElementById('sections-grid');
+el.innerHTML = '';
+Object.keys(SECTIONS).forEach(key => {
+const sec = SECTIONS[key];
+const card = document.createElement('label');
+card.className = 'section-card' + (selected.has(key) ? ' checked' : '');
+card.innerHTML = `
+<input type="checkbox" data-key="${key}" ${selected.has(key) ? 'checked' : ''}>
+<span class="icon">${sec.icon}</span>
+<div style="flex:1">
+<div class="name">${sec.name}</div>
+<div class="key">${key}</div>
+</div>
+`;
+const cb = card.querySelector('input');
+cb.onchange = () => {
+if (cb.checked) selected.add(key);
+else selected.delete(key);
+renderSections();
+regenerate();
+};
+el.appendChild(card);
+});
+document.getElementById('count-badge').textContent = `${selected.size} / ${Object.keys(SECTIONS).length}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SELECTION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function selectPreset(key) {
+if (!PRESETS[key]) return;
+currentPreset = key;
+selected = new Set(PRESETS[key]);
+renderPresets();
+renderSections();
+regenerate();
+}
+
+function clearAll() {
+selected = new Set();
+currentPreset = '';
+renderPresets();
+renderSections();
+regenerate();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GÉNÉRATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function regenerate() {
+const header = document.getElementById('opt-header').checked;
+const comments = document.getElementById('opt-comments').checked;
+
+const resp = await fetch('/api/generate', {
+method: 'POST',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({
+sections: Array.from(selected),
+header: header,
+comments: comments
+})
+});
+const data = await resp.json();
+const output = document.getElementById('output');
+output.value = data.content || '';
+
+// Stats
+const lines = output.value.split('\n').length;
+const chars = output.value.length;
+const bytes = new Blob([output.value]).size;
+document.getElementById('stat-lines').textContent = lines;
+document.getElementById('stat-chars').textContent = chars.toLocaleString('fr-FR');
+document.getElementById('stat-size').textContent = formatBytes(bytes);
+document.getElementById('stat-sections').textContent = selected.size;
+}
+
+function formatBytes(b) {
+if (b < 1024) return b + ' B';
+if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+return (b / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCAN PROJET
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function scanProject() {
+const path = document.getElementById('scan-path').value.trim();
+if (!path) return;
+
+const el = document.getElementById('scan-result');
+el.textContent = '⏳ Scan...';
+
+const resp = await fetch('/api/detect', {
+method: 'POST',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({ path: path })
+});
+const data = await resp.json();
+
+if (!data.ok) {
+el.innerHTML = `<span style="color:#ff4466">✗ ${data.error}</span>`;
+return;
+}
+
+el.innerHTML = `✓ Détecté : <b style="color:#00ff88">${data.types.join(', ')}</b> — ${data.files_count} fichiers analysés`;
+
+// Auto-sélectionner le preset correspondant
+const preset = data.preset || 'python';
+if (PRESETS[preset]) {
+selectPreset(preset);
+}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function copyOutput() {
+const output = document.getElementById('output');
+output.select();
+document.execCommand('copy');
+showToast('✓ Copié dans le presse-papiers');
+}
+
+function downloadOutput() {
+const content = document.getElementById('output').value;
+const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = '.gitignore';
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+showToast('✓ .gitignore téléchargé');
+}
+
+function showToast(msg) {
+const t = document.getElementById('toast');
+t.textContent = msg;
+t.classList.add('show');
+setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OPTIONS CHANGENT → RÉGÉNÉRER
+// ═══════════════════════════════════════════════════════════════════════════
+
+document.getElementById('opt-header').onchange = regenerate;
+document.getElementById('opt-comments').onchange = regenerate;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+
+renderPresets();
+selectPreset('python');
+</script>
+</body>
+</html>
+"""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HTTP HANDLER
+# ═══════════════════════════════════════════════════════════════════════════
+
+class Handler(BaseHTTPRequestHandler):
+server_version = "NexusGitignoreForge/" + VERSION
+protocol_version = "HTTP/1.1"
+
+def log_message(self, *a):
+pass
+
+def _send(self, code, body, ctype="application/json; charset=utf-8"):
+if isinstance(body, str):
+body = body.encode("utf-8")
+try:
+self.send_response(code)
+self.send_header("Content-Type", ctype)
+self.send_header("Content-Length", str(len(body)))
+self.send_header("Access-Control-Allow-Origin", "*")
+self.end_headers()
+self.wfile.write(body)
+except (BrokenPipeError, ConnectionResetError):
+pass
+
+def _json(self, code, obj):
+self._send(code, json.dumps(obj, indent=2, ensure_ascii=False))
+
+def _html(self, code, text):
+self._send(code, text, "text/html; charset=utf-8")
+
+def _body_json(self):
+try:
+length = int(self.headers.get("Content-Length", "0") or "0")
+except Exception:
+length = 0
+if length <= 0 or length > 5_000_000:
+return {}
+try:
+return json.loads(self.rfile.read(length).decode("utf-8", "ignore") or "{}")
+except Exception:
+return {}
+
+def do_GET(self):
+path = urllib.parse.urlparse(self.path).path
+try:
+if path in ("/", "/index.html"):
+html = HTML_PAGE.replace("__V__", VERSION)
+html = html.replace("__SECTIONS_JSON__", json.dumps(SECTIONS, ensure_ascii=False))
+html = html.replace("__PRESETS_JSON__", json.dumps(PRESETS, ensure_ascii=False))
+return self._html(200, html)
+
+if path == "/api/status":
+return self._json(200, {
+"ok": True,
+"version": VERSION,
+"auteur": AUTEUR,
+"licence": LICENCE,
+"sections": len(SECTIONS),
+"presets": len(PRESETS),
+})
+
+if path == "/api/sections":
+return self._json(200, {"ok": True, "sections": SECTIONS, "presets": PRESETS})
+
+return self._json(404, {"ok": False, "error": "not found"})
+except Exception as e:
+return self._json(500, {"ok": False, "error": str(e)})
+
+def do_POST(self):
+path = urllib.parse.urlparse(self.path).path
+try:
+data = self._body_json()
+
+if path == "/api/generate":
+sections = data.get("sections", [])
+header = data.get("header", True)
+comments = data.get("comments", True)
+content = generate_gitignore(sections, header, comments)
+return self._json(200, {
+"ok": True,
+"content": content,
+"lines": content.count("\n") + 1,
+"chars": len(content),
+})
+
+if path == "/api/detect":
+scan_path = data.get("path", "").strip()
+scan_path = os.path.expanduser(scan_path)
+if not os.path.isdir(scan_path):
+return self._json(200, {"ok": False, "error": "Dossier introuvable"})
+
+types = detect_project_type(scan_path)
+# Choisir le preset basé sur le type détecté
+preset = "python"
+if "django" in types: preset = "django"
+elif "flask" in types: preset = "flask"
+elif "fastapi" in types: preset = "fastapi"
+elif "scrapy" in types: preset = "scrapy"
+elif "celery" in types: preset = "celery"
+elif "data-science" in types: preset = "data-science"
+elif "cobol" in types: preset = "cobol"
+elif "node" in types: preset = "node"
+elif "rust" in types: preset = "rust"
+elif "go" in types: preset = "go"
+
+try:
+files_count = sum(1 for _ in Path(scan_path).iterdir())
+except OSError:
+files_count = 0
+
+return self._json(200, {
+"ok": True,
+"types": types,
+"preset": preset,
+"files_count": files_count,
+})
+
+return self._json(404, {"ok": False, "error": "not found"})
+except Exception as e:
+return self._json(500, {"ok": False, "error": str(e)})
+
+def do_OPTIONS(self):
+try:
+self.send_response(204)
+self.send_header("Access-Control-Allow-Origin", "*")
+self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+self.send_header("Access-Control-Allow-Headers", "*")
+self.send_header("Content-Length", "0")
+self.end_headers()
+except Exception:
+pass
+
+
+class Server(ThreadingMixIn, HTTPServer):
+daemon_threads = True
+allow_reuse_address = True
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# UTILITAIRES
+# ═══════════════════════════════════════════════════════════════════════════
+
+def port_libre(host, port):
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+s.settimeout(1)
+s.bind((host, port))
+return True
+except OSError:
+return False
+finally:
+try:
+s.close()
+except Exception:
+pass
+
+
+def trouver_port(host, start, max_tries=20):
+for p in range(start, start + max_tries):
+if port_libre(host, p):
+return p
+return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════════════════
+
+def main():
+ap = argparse.ArgumentParser(description="NEXUS Gitignore Forge")
+ap.add_argument("--port", type=int, default=PORT)
+ap.add_argument("--host", default=HOST)
+args = ap.parse_args()
+
+print("")
+print("=" * 74)
+print(f" NEXUS GITIGNORE FORGE v{VERSION} — {CODENAME}")
+print("=" * 74)
+print(f" Auteur : {AUTEUR}")
+print(f" Licence : {LICENCE}")
+print("=" * 74)
+print("")
+print(f" Sections disponibles : {len(SECTIONS)}")
+print(f" Presets disponibles : {len(PRESETS)}")
+print("")
+
+port = args.port
+if not port_libre(args.host, port):
+print(f" Port {port} occupé, recherche...")
+new_port = trouver_port(args.host, port + 1)
+if new_port is None:
+print(" Aucun port libre.")
+return
+port = new_port
+
+print(f" Interface : http://{args.host}:{port}/")
+print(f" Local : http://localhost:{port}/")
+print("")
+print(" Ctrl+C pour arrêter")
+print("")
+
+try:
+with Server((args.host, port), Handler) as httpd:
+httpd.serve_forever()
+except KeyboardInterrupt:
+print("\n Arrêt.")
+except OSError as e:
+print(f" Erreur bind : {e}")
+
+
+if __name__ == "__main__":
+main()
